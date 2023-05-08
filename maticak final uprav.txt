@@ -1,0 +1,301 @@
+;|Nigrin Tomáš - A4| 
+.Nolist
+.Include "m128def.inc"
+.List
+
+.EQU pocet_symb = 10	;Nastavení maximalniho počtu symbolu
+
+.DEF temp = 		R16
+.DEF CountUP = 		R17
+.DEF CountDown =	R18
+.DEF Counter= 		R19
+.DEF timer = 		R20
+.DEF odeslani = 	R21
+.DEF tab_reg = 		R22
+
+.dseg
+Tabulka: .BYTE 10
+
+.cseg
+.org 0x0000 
+JMP INIT
+.org 0x0014
+JMP zobraz
+.org 0x001C
+JMP posun
+
+
+INIT:
+//Nastaveni zasobniku
+	LDI temp, LOW(RAMEND)
+	STS SPL, temp
+	LDI temp, HIGH(RAMEND)
+	OUT SPH, temp
+//Nastaveni periferii
+	LDI temp, 0x0F
+	OUT DDRB, temp
+	LDI temp, 0xFF
+	OUT DDRE, temp
+//Nastavení X-registeru
+	LDI XL, low(Tabulka) 
+	LDI XH, high(Tabulka)
+//Nastavení Z-registeru
+	LDI ZL, low(2*Tab)
+	LDI ZH, high(2*Tab)
+//Nastavení timeru 0
+	LDI temp, 0x07
+	OUT TCCR0, temp
+//Nastavení timeru 2
+	LDI temp, 0x04  //1ms
+	OUT TCCR2, temp
+//Nastavení timeru 1
+	LDI temp,0
+	OUT TCCR1A,temp
+	LDI R16,0b00000101 //4s
+	OUT TCCR1B, temp 
+	LDI temp,0b01000100 	
+	OUT TIMSK,temp
+MAIN:
+	LDI temp, 0b11110111
+	OUT PORTB, temp
+	CALL DELAY
+	IN temp, PINB
+	CPI temp, 0b1101_0111 ;Bylo stisknuto tlacitko F1?
+	BREQ IMPORT
+	JMP MAIN
+	
+
+IMPORT:
+	CLI						;zakazani přerušení
+	LDI XL, low(Tabulka) 	;nastavení ukazatele
+	LDI XH, high(Tabulka)
+	LDI CountDown, pocet_symb
+
+READ:
+	LDI temp, 0B11110111
+	OUT PORTB, temp
+	CALL DELAY
+		IN temp, PINB
+		CPI temp, 0b1011_0111 ;Bylo stisknuto tlacitko F2?
+		BREQ Mustek_Exp
+	CPI CountDown, 0
+	BREQ READ
+
+;Prvni sloupec
+	LDI temp, 0B11111110	//Aktivace sloupce/řádku
+	OUT PORTB, temp
+	RCALL DELAY
+
+;Tlac_1:
+	SBIC PINB, 4		;pokud stisknuto přeskočení instrukce
+	JMP Tlac4
+Wait1:
+	SBIS PINB, 4		;pokud nestisknuto přeskočení instrukce
+	JMP Wait1
+	JMP Jedna
+	
+Tlac4:
+	SBIC PINB, 5
+	JMP Tlac7
+Wait2:
+	SBIS PINB, 5
+	JMP Wait2
+	JMP Ctyri
+
+Tlac7:
+	SBIC PINB, 6
+	JMP Sloupec2
+Wait3:
+	SBIS PINB, 6
+	JMP Wait3
+	JMP Sedm
+
+Mustek_Exp:
+JMP EXPORT
+
+Sloupec2: ;Druhej sloupec
+	LDI temp, 0B11111101
+	OUT PORTB, temp
+	RCALL DELAY
+
+	SBIC PINB, 4
+	JMP Tlac5
+Wait5:
+	SBIS PINB, 4
+	JMP Wait5
+	JMP Dva
+
+Tlac5:
+	SBIC PINB, 5
+	JMP Tlac8
+Wait6:
+	SBIS PINB, 5
+	JMP Wait6
+	JMP Pet
+
+Tlac8:
+	SBIC PINB, 6
+	JMP Tlac0
+Wait7:
+	SBIS PINB, 6
+	JMP Wait7
+	JMP Osm
+
+Tlac0:
+	SBIC PINB, 7
+	JMP Sloupec3
+Wait8:
+	SBIS PINB, 7
+	JMP Wait8
+	JMP Nula
+
+Sloupec3: ;Treti sloupec
+	LDI temp, 0B11111011
+	OUT PORTB, temp
+	RCALL DELAY
+
+	SBIC PINB, 4
+	JMP Tlac6
+Wait9:
+	SBIS PINB, 4
+	JMP Wait9
+	JMP Tri
+
+Tlac6:
+	SBIC PINB, 5
+	JMP Tlac9
+Wait10:
+	SBIS PINB, 5
+	JMP Wait10
+	JMP Sest
+
+Tlac9:
+	SBIC PINB, 6
+	JMP Tlachash
+Wait11:
+	SBIS PINB, 6
+	JMP Wait11
+	JMP Devet
+	JMP READ
+
+Jedna:
+	LDI temp, 0x08
+	ST X+,temp		;uložení do datove pameti
+	JMP Ukladani
+Dva:
+	LDI temp, 0x10
+	ST X+,temp	
+	JMP Ukladani
+Tri:
+	LDI temp, 0x20
+	ST X+,temp
+	JMP Ukladani
+Ctyri:
+	LDI temp, 0x28
+	ST X+,temp
+	JMP Ukladani
+Pet:
+	LDI temp, 0x30
+	ST X+,temp
+	JMP Ukladani
+Sest:
+	LDI temp, 0x38
+	ST X+,temp
+	JMP Ukladani
+MUSTEK_Imp:
+JMP IMPORT
+Mustek:
+JMP READ
+Sedm:
+	LDI temp, 0x40
+	ST X+,temp
+	JMP Ukladani
+Osm:
+	LDI temp, 0x48
+	ST X+,temp
+	JMP Ukladani
+Devet:
+	LDI temp, 0x50
+	ST X+,temp
+	JMP Ukladani
+Nula:
+	LDI temp, 0x00
+	ST X+,temp
+	JMP Ukladani
+Ukladani:
+	INC COUNTUP		;inkrementace counteru
+	DEC COUNTDOWN	;dekrementace counteru
+	BREQ Mustek		;pokud countdown 0 skok
+	JMP READ		;smyčka
+
+EXPORT:
+	LDI XL, low(Tabulka) ;nastaveni ukazatele na pocatek
+	LDI XH, high(Tabulka)
+	LD tab_reg, X+		;nahrani hodnoty z datove pameti
+	LDI ZL, low(2*Tab)	;nastaveni ukazatele na pocatek tabulky
+	LDI ZH, high(2*Tab)
+	ADD ZL, tab_reg		;nastaveni ukazatele dle hodnoty
+	LDI temp,0
+	ADC ZH, temp
+	MOV COUNTDOWN,COUNTUP	;presun counteru do counteru
+	LDI temp, 0b11110111	;nastaveni sloupce pro F1
+	OUT PORTB, temp
+	CALL DELAY
+	LDI counter, 7
+	SEI						;povoleni preruseni
+
+CYKLUS:
+	IN temp, PINB
+	CPI temp, 0b1101_0111 ;Bylo stisknuto tlacitko F1?
+	BREQ Mustek_Imp
+	JMP CYKLUS
+
+Zobraz:					;preruseni 1ms
+	LPM odeslani, Z+	;nahrani hodnoty z tabulky
+	OUT PORTE,odeslani	;odeslani na port
+	DEC Counter			;dekremetace
+	BREQ RESET		
+	RETI
+
+RESET:
+	LDI ZL, low(2*Tab)	;nastaveni ukazatele v tabulce na pocatek
+	LDI ZH, high(2*Tab)
+	ADD ZL, tab_reg		;posunuti ukazatele dle hodnoty
+	LDI Counter,7
+	RETI				
+
+Posun:				;preruseni 4s
+	DEC COUNTDOWN	;dekrementace counteru
+	BREQ RESET1		;pokud counter=0 skok
+	LD tab_reg, X+	;nahrani hodnoty z datove pameti
+	LDI ZL, low(2*Tab)	;nastaveni ukazatele v tabulce na pocatek
+	LDI ZH, high(2*Tab)
+	ADD ZL, tab_reg		;posunuti ukazatele v tabulce dle hodnoty
+	RETI
+
+RESET1:
+	LDI XL, low(Tabulka) ;nastaveni ukazatele v datove pameti na pocatek
+	LDI XH, high(Tabulka)
+	LD tab_reg, X+		;nahrani hodnoty z datove tabulky na pocatek
+	MOV COUNTDOWN,COUNTUP	;presun counteru do counteru
+	RETI
+	
+DELAY:	
+IN timer, TIFR
+SBRS timer, 0 ; Skip if Bit in Register is Set (1)
+JMP DELAY
+OUT TIFR, timer
+RET
+
+Tab:
+.db 0b10001_000, 0b01110_100, 0b01110_010, 0b01110_110, 0b01110_001,0b01110_101, 0b10001_011, 0x00 ;0
+.db 0b11101_000, 0b11001_100, 0b10101_010, 0b11101_110, 0b11101_001,0b11101_101, 0b11101_011, 0x00 ;1
+.db 0b10001_000, 0b01110_100, 0b11110_010, 0b11101_110, 0b11011_001,0b10111_101, 0b00000_011, 0x00 ;2
+.db 0b10001_000, 0b01110_100, 0b11110_010, 0b11001_110, 0b11110_001,0b01110_101, 0b10001_011, 0x00 ;3
+.db 0b11101_000, 0b11001_100, 0b10101_010, 0b01101_110, 0b00000_001,0b11101_101, 0b11101_011, 0x00 ;4
+.db 0b00000_000, 0b01111_100, 0b00001_010, 0b11110_110, 0b11110_001,0b01110_101, 0b10001_011, 0x00 ;5
+.db 0b10001_000, 0b01110_100, 0b01111_010, 0b00001_110, 0b01110_001,0b01110_101, 0b10001_011, 0x00 ;6
+.db 0b00000_000, 0b11110_100, 0b11101_010, 0b11011_110, 0b11011_001,0b11011_101, 0b11011_011, 0x00 ;7
+.db 0b10001_000, 0b01110_100, 0b01110_010, 0b10001_110, 0b01110_001,0b01110_101, 0b10001_011, 0x00 ;8
+.db 0b10001_000, 0b01110_100, 0b01110_010, 0b10000_110, 0b11110_001,0b01110_101, 0b10001_011, 0x00 ;9
+
